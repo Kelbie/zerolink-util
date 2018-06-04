@@ -8,10 +8,11 @@ def threaded(fn):
         threading.Thread(target=fn, args=args, kwargs=kwargs).start()
     return wrapper
 
-def log(message):
-    print("{:02}-{:02}-{:02} {:02}:{:02}:{:02} - {}".format(
+def log(message, response):
+    print("{:02}-{:02}-{:02} {:02}:{:02}:{:02} - {} - {}".format(
             *list(time.gmtime())[0:6],
-            message
+            message,
+            response
         )
     )
 
@@ -36,7 +37,7 @@ class ZeroLink:
     def postInputs(self):
         response = self.session.post(self.url + "inputs", json=self.inputs)
         self.reference = json.loads(response.text)
-        log("Post Input(s)")
+        log("Post Input(s)", response)
         return self.reference
 
     @threaded
@@ -46,7 +47,7 @@ class ZeroLink:
                 self.url + "confirmation?uniqueId={}&roundId={}".format(
                     self.reference["uniqueId"],
                     self.reference["roundId"]))
-            log("Post Confirmation")
+            log("Post Confirmation", response)
 
             if loop:
                 time.sleep(55)
