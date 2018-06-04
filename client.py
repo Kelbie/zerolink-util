@@ -9,6 +9,13 @@ def threaded(fn):
         threading.Thread(target=fn, args=args, kwargs=kwargs).start()
     return wrapper
 
+def log(message):
+    print("{:02}-{:02}-{:02} {:02}:{:02}:{:02} - {}".format(
+            *list(time.gmtime())[0:6],
+            message
+        )
+    )
+
 class ZeroLink:
     def __init__(self, inputs):
         self.session = requests.session()
@@ -32,14 +39,14 @@ class ZeroLink:
         response = self.session.post('http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/inputs', json=self.inputs)
         response = json.dumps(json.loads(response.text), sort_keys=True, indent=4)
         self.reference = ast.literal_eval(response)
-        print("{}-{}-{} {}:{}:{} - Post Input(s)".format(*list(time.gmtime())[0:6]))
+        log("Post Input(s)")
         return self.reference
 
     @threaded
     def postConfirmation(self, loop=False):
         while True:
             response = self.session.post('http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/confirmation?uniqueId={}&roundId={}'.format(self.reference["uniqueId"], self.reference["roundId"]))
-            print("{}-{}-{} {}:{}:{} - Post Confirmation".format(*list(time.gmtime())[0:6]))
+            log("Post Confirmation")
 
             if loop:
                 time.sleep(55)
