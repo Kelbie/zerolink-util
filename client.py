@@ -2,7 +2,6 @@ import requests
 import json
 import threading
 import time
-import ast
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -31,14 +30,11 @@ class ZeroLink:
 
     def getStates(self):
         response = self.session.get(self.url + "states")
-        response = json.dumps(json.loads(response.text), sort_keys=True, indent=4)
-        self.states = ast.literal_eval(response)
+        self.states = json.loads(response.text)
         return self.states
 
     def postInputs(self):
         response = self.session.post(self.url + "inputs", json=self.inputs)
-        response = json.dumps(json.loads(response.text), sort_keys=True, indent=4)
-        self.reference = ast.literal_eval(response)
         log("Post Input(s)")
         return self.reference
 
@@ -56,3 +52,11 @@ class ZeroLink:
             else:
                 break
 
+      "BlindedOutputScriptHex": "76a9149f9a7abd600c0caa03983a77c8c3df8e062cb2fa88ac",
+      "ChangeOutputAddress": "tb1qzz3ng29fup5rf47v0ls79xl34rtpyvdpwn8c8j"
+    }
+)
+
+print(zl.getStates())
+zl.postInputs()
+zl.postConfirmation(loop=True)
