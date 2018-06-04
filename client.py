@@ -1,7 +1,13 @@
 import requests
 import json
+import threading
 import time
 import ast
+
+def threaded(fn):
+    def wrapper(*args, **kwargs):
+        threading.Thread(target=fn, args=args, kwargs=kwargs).start()
+    return wrapper
 
 class ZeroLink:
     def __init__(self, inputs):
@@ -29,6 +35,7 @@ class ZeroLink:
         print("{}-{}-{} {}:{}:{} - Post Input(s)".format(*list(time.gmtime())[0:6]))
         return self.reference
 
+    @threaded
     def postConfirmation(self, loop=False):
         while True:
             response = self.session.post('http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/confirmation?uniqueId={}&roundId={}'.format(self.reference["uniqueId"], self.reference["roundId"]))
