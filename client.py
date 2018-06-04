@@ -54,3 +54,9 @@ class ZeroLink:
             else:
                 break
 
+    def postUnconfirmation(self):
+        response = self.session.post(
+            self.url + "unconfirmation?uniqueId={}&roundId={}".format(
+                self.reference["uniqueId"],
+                self.reference["roundId"]))
+        log("Post Unconfirmation", response)
