@@ -2,7 +2,6 @@ import requests
 import json
 import threading
 import time
-import ast
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -31,14 +30,12 @@ class ZeroLink:
 
     def getStates(self):
         response = self.session.get(self.url + "states")
-        response = json.dumps(json.loads(response.text), sort_keys=True, indent=4)
-        self.states = ast.literal_eval(response)
+        self.states = json.loads(response.text)
         return self.states
 
     def postInputs(self):
         response = self.session.post(self.url + "inputs", json=self.inputs)
-        response = json.dumps(json.loads(response.text), sort_keys=True, indent=4)
-        self.reference = ast.literal_eval(response)
+        self.reference = json.loads(response.text)
         log("Post Input(s)")
         return self.reference
 
