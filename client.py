@@ -17,14 +17,18 @@ def log(message, response):
     )
 
 class ZeroLink:
-    def __init__(self, inputs):
+    def __init__(self, blindedOutputScriptHex, changeOutputAddress):
         self.session = requests.session()
         self.session.proxies = {
             'http':  'socks5h://localhost:9050',
             'https': 'socks5h://localhost:9050'
         }
         self.url = "http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/"
-        self.inputs = inputs
+        self.inputs = {
+          "Inputs": [],
+          "BlindedOutputScriptHex": blindedOutputScriptHex,
+          "ChangeOutputAddress": changeOutputAddress
+        }
 
         self.states = None
         self.reference = None
@@ -33,6 +37,17 @@ class ZeroLink:
         response = self.session.get(self.url + "states")
         self.states = json.loads(response.text)
         return self.states
+
+    def addInput(self, txid, vout, proof):
+        self.inputs["Inputs"].append(
+            {
+              "Input": {
+                "TransactionId": txid,
+                "Index": vout
+              },
+              "Proof": proof
+            }
+        )
 
     def postInputs(self):
         response = self.session.post(self.url + "inputs", json=self.inputs)
