@@ -23,15 +23,13 @@ class ZeroLink:
             'http':  'socks5h://localhost:9050',
             'https': 'socks5h://localhost:9050'
         }
+        
         self.url = "http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/"
         self.inputs = {
           "Inputs": [],
           "BlindedOutputScriptHex": blindedOutputScriptHex,
           "ChangeOutputAddress": changeOutputAddress
         }
-
-        self.states = None
-        self.reference = None
 
     def getStates(self):
         response = self.session.get(self.url + "states")
