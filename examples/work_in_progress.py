@@ -29,3 +29,4 @@ status = zl.postInputs()
 #     'roundId': 1
 # }
 
+zl.postConfirmation(loop=True)
