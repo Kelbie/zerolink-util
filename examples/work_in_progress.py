@@ -21,17 +21,30 @@ keys = (rsa.key.PublicKey(920911890858045656436482590209070509635416852196633398
 
 r = 1234567890
 
-outputScriptHex = int("0014d4246b7315b5f8083c45dd250ef8dd9c69efb6ff", 16)
-changeOutputAddress = "tb1q6sjxkuc4khuqs0z9m5jsa7xan357ldhln6perd"
+# Setup
+unspent = ast.literal_eval(bitcoinRPC("listunspent"))["result"]
+_input = unspent[0]
+outputs = {
+    ast.literal_eval(bitcoinRPC("getnewaddress", params=["", "bech32"]))["result"]: 0.1
+    }
+tx_template = [[{"txid": _input["txid"], "vout": _input["vout"]}], outputs]
+tx_hex = ast.literal_eval(bitcoinRPC("createrawtransaction", params=tx_template))["result"]
+
+outputScriptHex = ast.literal_eval(bitcoinRPC("decoderawtransaction", params=[tx_hex]))["result"]["vout"][0]["scriptPubKey"]["hex"]
+changeOutputAddress = ast.literal_eval(bitcoinRPC("getnewaddress", params=["", "bech32"]))["result"]
 
 blindedOutputScriptHex = keys[0].blind(outputScriptHex, r)
 blindedOutputScriptHex = str(format(blindedOutputScriptHex, 'x'))
 
 zl = client.ZeroLink(blindedOutputScriptHex, changeOutputAddress)
 
-txid = "16bcb1754380b532646d12fe4d8ad644cfc6ea1d6b7fae06d6c1fa997e00c559"
-vout = 0
-proof = "ICxkqbhPrKwukCV9Q0nTgRgETAWbR+fTiYjVf8t5H+l6IaMIi6OBQQoNvTX83g12hZNZAUEIXcaXO1Bz5cAnthI="
+txid = _input["txid"]
+vout = _input["vout"]
+
+# Proof
+input_address = _input["address"]
+dumpprivkey = ast.literal_eval(bitcoinRPC("dumpprivkey", params=[_input["address"]]))["result"]
+proof =  ast.literal_eval(bitcoinRPC("signmessagewithprivkey", params=[dumpprivkey, blindedOutputScriptHex]))["result"]
 
 zl.addInput(txid, vout, proof)
 
