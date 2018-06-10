@@ -33,7 +33,7 @@ tx_hex = ast.literal_eval(bitcoinRPC("createrawtransaction", params=tx_template)
 outputScriptHex = ast.literal_eval(bitcoinRPC("decoderawtransaction", params=[tx_hex]))["result"]["vout"][0]["scriptPubKey"]["hex"]
 changeOutputAddress = ast.literal_eval(bitcoinRPC("getnewaddress", params=["", "bech32"]))["result"]
 
-blindedOutputScriptHex = keys[0].blind(outputScriptHex, r)
+blindedOutputScriptHex = keys[0].blind(int(outputScriptHex, 16), r)
 blindedOutputScriptHex = str(format(blindedOutputScriptHex, 'x'))
 
 zl = client.ZeroLink(blindedOutputScriptHex, changeOutputAddress)
@@ -49,10 +49,5 @@ proof =  ast.literal_eval(bitcoinRPC("signmessagewithprivkey", params=[dumpprivk
 zl.addInput(txid, vout, proof)
 
 status = zl.postInputs()
-# {
-#     'blindedOutputSignature': 'TgtGKqEIZDNljEM02aCH9OY1UG7zFKdhNMzdfc+OAmvXWRQu0QHNZOiCV/yAGSILg9K9yhnLlZ+E8H+XnA7t+qDhGO0Whwhz8VJVqDr4TZUav2Wrx8cYmuye9WwYcDJovoK8Bw+SyAZSjaljXRny5rNXDVT293RSIwrCeKELY5P080QQ1OyZjBGqGU806XYEmYy9pL+0ThQGMvu63esSWtHAm/n+8ZHCzaCEQvEdxWbaAaPOXbv0ZUU6gwm2YZUuUz2fTM5mkjfrALb+OlfB9ziE1pBM+dE0MvNyLc2hzELXpSNZvsg3AoAy/E/d67gzgluDoW0XbMJohtxGd1H/Fg==',
-#     'uniqueId': 'b0eb6cac31f64d538cb138bfe5649105',
-#     'roundId': 1
-# }
 
 zl.postConfirmation(loop=True)
