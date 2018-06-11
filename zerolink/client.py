@@ -119,3 +119,15 @@ class ZeroLink:
                 self.reference["uniqueId"],
                 self.reference["roundId"]))
         log("Post Unconfirmation", response)
+
+    # Untested
+    def postOutput(self, output):
+        response = self.session.post(
+            self.url + "output?roundHash={}".format(
+                self.reference.roundHash), json=ouput)
+        log("Post Output", response)
+
+    def getCoinJoin(self):
+        response = self.session.get(self.url + "coinjoin")
+        self.coinjoin = json.loads(response.text)
+        return self.coinjoin
