@@ -58,23 +58,15 @@ class ZeroLink:
         self.inputs["BlindedOutputScriptHex"] = blindedOutputScriptHex
         self.inputs["ChangeOutputAddress"] = changeOutputAddress
 
-        txid = _input["txid"]
-        vout = _input["vout"]
+        self.txid = _input["txid"]
+        self.vout = _input["vout"]
 
         input_address = _input["address"]
         dumpprivkey = bitcoinRPC("dumpprivkey", params=[input_address])
-        proof =  bitcoinRPC("signmessagewithprivkey", params=[dumpprivkey, blindedOutputScriptHex])
+        self.proof =  bitcoinRPC("signmessagewithprivkey", params=[dumpprivkey, blindedOutputScriptHex])
 
         self.inputs["Inputs"] = []
-        self.inputs["Inputs"].append(
-            {
-              "Input": {
-                "TransactionId": txid,
-                "Index": vout
-              },
-              "Proof": proof
-            }
-        )
+        self.addInput()
 
 
     def getStates(self):
@@ -82,14 +74,14 @@ class ZeroLink:
         self.states = json.loads(response.text)
         return self.states
 
-    def __addInput(self, txid, vout, proof):
+    def addInput(self):
         self.inputs["Inputs"].append(
             {
               "Input": {
-                "TransactionId": txid,
-                "Index": vout
+                "TransactionId": self.txid,
+                "Index": self.vout
               },
-              "Proof": proof
+              "Proof": self.proof
             }
         )
 
