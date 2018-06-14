@@ -41,9 +41,19 @@ class ZeroLink:
 
         r = 1234567890
 
-        unspent = bitcoinRPC("listunspent")
-        _input = unspent[0]
-        outputs = {
+        utxos = bitcoinRPC("listunspent")
+        self.w = open('info.txt', "a+")
+        self.r = open('info.txt', 'r')
+        lines = list(map(ast.literal_eval, self.r.read().splitlines()))
+        for utxo in utxos:
+            if {"txid": utxo["txid"], "vout": utxo["vout"]} not in lines:
+                self._input = utxo
+                self.w.write(str({"txid": self._input["txid"], "vout": self._input["vout"]}) + "\n")
+                break
+        else:
+            raise ValueError("No UTXO's available.")
+        self.w.close()
+        self.r.close()
             bitcoinRPC("getnewaddress", params=["", "bech32"]): 0.1
         }
         tx_template = [[{"txid": _input["txid"], "vout": _input["vout"]}], outputs]
