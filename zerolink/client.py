@@ -54,11 +54,12 @@ class ZeroLink:
             raise ValueError("No UTXO's available.")
         self.w.close()
         self.r.close()
+
+        self.outputs = {
             bitcoinRPC("getnewaddress", params=["", "bech32"]): 0.1
         }
-        tx_template = [[{"txid": _input["txid"], "vout": _input["vout"]}], outputs]
-        tx_hex = bitcoinRPC("createrawtransaction", params=tx_template)
-
+        tx = [[{"txid": self._input["txid"], "vout": self._input["vout"]}], self.outputs]
+        tx_hex = bitcoinRPC("createrawtransaction", params=tx)
 
         outputScriptHex = bitcoinRPC("decoderawtransaction", params=[tx_hex])["vout"][0]["scriptPubKey"]["hex"]
         changeOutputAddress = bitcoinRPC("getnewaddress", params=["", "bech32"])
@@ -69,10 +70,10 @@ class ZeroLink:
         self.inputs["BlindedOutputScriptHex"] = blindedOutputScriptHex
         self.inputs["ChangeOutputAddress"] = changeOutputAddress
 
-        self.txid = _input["txid"]
-        self.vout = _input["vout"]
+        self.txid = self._input["txid"]
+        self.vout = self._input["vout"]
 
-        input_address = _input["address"]
+        input_address = self._input["address"]
         dumpprivkey = bitcoinRPC("dumpprivkey", params=[input_address])
         self.proof =  bitcoinRPC("signmessagewithprivkey", params=[dumpprivkey, blindedOutputScriptHex])
 
