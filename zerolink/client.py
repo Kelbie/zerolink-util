@@ -64,6 +64,7 @@ class ZeroLink:
         changeOutputAddress = bitcoinRPC("getnewaddress", params=["", "bech32"])
 
         blindedOutputScriptHex = str(format(keys[0].blind(int(outputScriptHex, 16), r), 'x'))
+        blindedOutputScriptHex = "{0:0>128}".format(blindedOutputScriptHex)
 
         self.inputs["BlindedOutputScriptHex"] = blindedOutputScriptHex
         self.inputs["ChangeOutputAddress"] = changeOutputAddress
