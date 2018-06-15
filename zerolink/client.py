@@ -46,7 +46,7 @@ class ZeroLink:
         self.r = open('info.txt', 'r')
         lines = list(map(ast.literal_eval, self.r.read().splitlines()))
         for utxo in utxos:
-            if {"txid": utxo["txid"], "vout": utxo["vout"]} not in lines:
+            if {"txid": utxo["txid"], "vout": utxo["vout"]} not in lines and utxo["address"][0] == "t" and float(utxo["amount"]) > 0.1:
                 self._input = utxo
                 self.w.write(str({"txid": self._input["txid"], "vout": self._input["vout"]}) + "\n")
                 break
