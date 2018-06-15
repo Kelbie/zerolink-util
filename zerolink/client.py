@@ -83,8 +83,15 @@ class ZeroLink:
 
     def getStates(self):
         response = self.session.get(self.url + "states")
-        self.states = json.loads(response.text)
-        return self.states
+
+        log("Get States", response)
+
+        if response.status_code == 200:
+            # List of CcjRunningRoundStatus (Phase, Denomination, RegisteredPeerCount, RequiredPeerCount, MaximumInputCountPerPeer, FeePerInputs, FeePerOutputs, CoordinatorFeePercent)
+            self.states = json.loads(response.text)
+            return self.states
+        else:
+            raise("Unexpected status code.")
 
     def addInput(self):
         self.inputs["Inputs"].append(
@@ -99,9 +106,21 @@ class ZeroLink:
 
     def postInputs(self):
         response = self.session.post(self.url + "inputs", json=self.inputs)
-        self.reference = json.loads(response.text)
+
         log("Post Input(s)", response)
-        return self.reference
+
+        if response.status_code == 200:
+            # BlindedOutputSignature, UniqueId, RoundId
+            self.reference = json.loads(response.text)
+            return self.reference
+        elif response.status_code == 400:
+            # If request is invalid.
+            raise(response.text)
+        elif response.status_code == 503:
+            # If the round status changed while fulfilling the request.
+            raise(response.text)
+        else:
+            raise("Unexpected status code.")
 
     @threaded
     def postConfirmation(self, loop=False):
@@ -110,7 +129,30 @@ class ZeroLink:
                 self.url + "confirmation?uniqueId={}&roundId={}".format(
                     self.reference["uniqueId"],
                     self.reference["roundId"]))
+
             log("Post Confirmation", response)
+
+            if response.status_code == 200:
+                # RoundHash if the phase is already ConnectionConfirmation.
+                self.roundHash = json.loads(response.text)
+                print(self.roundHash)
+                # self.postOutput()
+                # time.sleep(5)
+                # self.getCoinJoin()
+            elif response.status_code == 204:
+                # If the phase is InputRegistration and Alice is found.
+                pass
+            elif response.status_code == 400:
+                # The provided uniqueId or roundId was malformed.
+                pass
+            elif response.status_code == 404:
+                # If Alice or the round is not found.
+                pass
+            elif response.status_code == 410:
+                # Participation can be only confirmed from a Running round’s InputRegistration or ConnectionConfirmation phase.
+                self.postOutput()
+            else:
+                raise("Unexpected status code.")
 
             if loop:
                 time.sleep(55)
@@ -122,16 +164,79 @@ class ZeroLink:
             self.url + "unconfirmation?uniqueId={}&roundId={}".format(
                 self.reference["uniqueId"],
                 self.reference["roundId"]))
+
         log("Post Unconfirmation", response)
 
-    # Untested
-    def postOutput(self, output):
+        if response.status_code == 200:
+            # Alice or the round was not found.
+            pass
+        elif response.status_code == 204:
+            # Alice sucessfully uncofirmed her participation.
+            pass
+        elif response.status_code == 400:
+            # The provided uniqueId or roundId was malformed.
+            pass
+        elif response.status_code == 410:
+            # Participation can be only unconfirmed from a Running round’s InputRegistration phase.
+            pass
+        else:
+            raise("Unexpected status code.")
+
+    # Not working
+    def postOutput(self):
+        sig = self.reference["blindedOutputSignature"]
+        outputSignature = self.keys[0].unblind(int(binascii.hexlify(bytes(sig.encode('utf-8'))).decode(), 16), self.random)
+        outputAddress = list(self.outputs)[0]
+        signatureHex = format(outputSignature, 'x')
+
         response = self.session.post(
             self.url + "output?roundHash={}".format(
-                self.reference.roundHash), json=ouput)
+                self.roundHash), json={
+                  "outputAddress": outputAddress,
+                  "signatureHex": signatureHex
+                })
+
         log("Post Output", response)
 
+        if response.status_code == 204:
+            # Output is successfully registered.
+            pass
+        elif response.status_code == 400:
+            # The provided roundHash or outpurRequest was malformed.
+            pass
+        elif response.status_code == 404:
+            # If round not found.
+            pass
+        elif response.status_code == 409:
+            # Output registration can only be done from OutputRegistration phase.
+            pass
+        elif response.status_code == 410:
+            # Output registration can only be done from a Running round.
+            pass
+
+        return response.text
+
+    # Not working
     def getCoinJoin(self):
-        response = self.session.get(self.url + "coinjoin")
-        self.coinjoin = json.loads(response.text)
-        return self.coinjoin
+        response = self.session.get(self.url + "coinjoin?uniqueId={}&roundId={}".format(
+            self.reference["uniqueId"],
+            self.reference["roundId"]))
+
+        log("Get CoinJoin", response)
+
+        if response.status_code == 200:
+            # Returns the coinjoin transaction.
+            self.coinjoin = json.loads(response.text)
+            return self.coinjoin
+        elif response.status_code == 400:
+            # The provided uniqueId or roundId was malformed.
+            pass
+        elif response.status_code == 404:
+            # If Alice or the round is not found.
+            pass
+        elif response.status_code == 409:
+            # CoinJoin can only be requested from Signing phase.
+            pass
+        elif response.status_code == 410:
+            # CoinJoin can only be requested from a Running round.
+            pass
