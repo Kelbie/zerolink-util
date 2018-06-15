@@ -37,9 +37,9 @@ class ZeroLink:
         self.reference = None
         self.inputs = {}
 
-        keys = rsa.newkeys(512)
+        self.keys = rsa.newkeys(512)
 
-        r = 1234567890
+        self.random = 1234567890
 
         utxos = bitcoinRPC("listunspent")
         self.w = open('info.txt', "a+")
@@ -64,7 +64,7 @@ class ZeroLink:
         outputScriptHex = bitcoinRPC("decoderawtransaction", params=[tx_hex])["vout"][0]["scriptPubKey"]["hex"]
         changeOutputAddress = bitcoinRPC("getnewaddress", params=["", "bech32"])
 
-        blindedOutputScriptHex = str(format(keys[0].blind(int(outputScriptHex, 16), r), 'x'))
+        blindedOutputScriptHex = str(format(self.keys[0].blind(int(outputScriptHex, 16), self.random), 'x'))
         blindedOutputScriptHex = "{0:0>128}".format(blindedOutputScriptHex)
 
         self.inputs["BlindedOutputScriptHex"] = blindedOutputScriptHex
