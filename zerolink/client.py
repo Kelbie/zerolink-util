@@ -5,6 +5,11 @@ import time
 import ast
 import rsa
 import binascii
+import base64
+
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
+from random import SystemRandom
 
 def threaded(fn):
     def wrapper(*args, **kwargs):
@@ -18,6 +23,12 @@ def log(message, response):
             response
         )
     )
+
+def printResponse(response):
+    if response.reason == "OK":
+        return response.reason
+    else:
+        return "ERROR: " + response.text
 
 def bitcoinRPC(method, params=[]):
     headers = {
@@ -34,52 +45,18 @@ class ZeroLink:
         self.session = requests.session()
         self.session.proxies = { 'http':  'socks5h://localhost:9050', 'https': 'socks5h://localhost:9050' }
         self.url = "http://wtgjmaol3io5ijii.onion/api/v1/btc/ChaumianCoinJoin/"
-        self.reference = None
-        self.inputs = {}
 
-        self.keys = rsa.newkeys(512)
+        # Works with 1024 bit RSA key
+        # self.pub = RSA.generate(2048).publickey()
+        # Doesn't work with 2048 bit RSA key
+        # self.pub = RSA.construct((19473594448380717274202325076521698699373476167359253614775896809797414915031772455344343455269320444157176520539924715307970060890094127521516100754263825112231545354422893125394219335109864514907655429499954825469485252969706079992227103439161156022844535556626007277544637236136559868400854764962522288139619969507311597914908752685925185380735570791798593290356424409633800092336087046668579610273133131498947353719917407262847070395909920415822288443947309434039008038907229064999576278651443575362470457496666718250346530518268694562965606704838796709743032825816642704620776596590683042135764246115456630753521, 65537))
 
-        self.random = 1234567890
+        self.pub = RSA.construct((1947359444838071727420232507652169869937347616735925361477589434039008038907229064999576278651443575362470457496666718250346530518268694562965606704838796709743032825816642704620776596590683042135764246115456630753521, 65537))
 
-        utxos = bitcoinRPC("listunspent")
-        self.w = open('info.txt', "a+")
-        self.r = open('info.txt', 'r')
-        lines = list(map(ast.literal_eval, self.r.read().splitlines()))
-        for utxo in utxos:
-            if {"txid": utxo["txid"], "vout": utxo["vout"]} not in lines and utxo["address"][0] == "t" and float(utxo["amount"]) > 0.1:
-                self._input = utxo
-                self.w.write(str({"txid": self._input["txid"], "vout": self._input["vout"]}) + "\n")
-                break
-        else:
-            raise ValueError("No UTXO's available.")
-        self.w.close()
-        self.r.close()
+        self.random = SystemRandom().randrange(self.pub.n >> 10, self.pub.n)
 
-        self.outputs = {
-            bitcoinRPC("getnewaddress", params=["", "bech32"]): 0.1
-        }
-        tx = [[{"txid": self._input["txid"], "vout": self._input["vout"]}], self.outputs]
-        tx_hex = bitcoinRPC("createrawtransaction", params=tx)
-
-        outputScriptHex = bitcoinRPC("decoderawtransaction", params=[tx_hex])["vout"][0]["scriptPubKey"]["hex"]
-        changeOutputAddress = bitcoinRPC("getnewaddress", params=["", "bech32"])
-
-        blindedOutputScriptHex = str(format(self.keys[0].blind(int(outputScriptHex, 16), self.random), 'x'))
-        blindedOutputScriptHex = "{0:0>128}".format(blindedOutputScriptHex)
-
-        self.inputs["BlindedOutputScriptHex"] = blindedOutputScriptHex
-        self.inputs["ChangeOutputAddress"] = changeOutputAddress
-
-        self.txid = self._input["txid"]
-        self.vout = self._input["vout"]
-
-        input_address = self._input["address"]
-        dumpprivkey = bitcoinRPC("dumpprivkey", params=[input_address])
-        self.proof =  bitcoinRPC("signmessagewithprivkey", params=[dumpprivkey, blindedOutputScriptHex])
-
-        self.inputs["Inputs"] = []
-        self.addInput()
-
+        self.inputs = []
+        self.outputs = {}
 
     def getStates(self):
         response = self.session.get(self.url + "states")
@@ -93,21 +70,48 @@ class ZeroLink:
         else:
             raise("Unexpected status code.")
 
-    def addInput(self):
-        self.inputs["Inputs"].append(
-            {
-              "Input": {
-                "TransactionId": self.txid,
-                "Index": self.vout
-              },
-              "Proof": self.proof
-            }
-        )
+    def addInput(self, txid, vout, privkey):
+        self.inputs.append({"txid": txid, "vout": vout, "privkey": privkey})
+
+    def addOutput(self, address, amount):
+        if amount != 0.1:
+            self.changeOutputAddress = address
+        self.outputs[address] = amount
+
+    def createTransaction(self):
+        tx = [[{"txid": self.inputs[0]["txid"], "vout": self.inputs[0]["vout"]}], self.outputs]
+        tx_hex = bitcoinRPC("createrawtransaction", params=tx)
+        raw_tx = bitcoinRPC("decoderawtransaction", params=[tx_hex])
+        import codecs
+        self.outputScriptHex = raw_tx["vout"][1]["scriptPubKey"]["asm"]
+        self.blindedOutputScriptHex = self.pub.blind(bytes(self.outputScriptHex, "utf-8"), self.random).hex()
+
+        print(len(bytes.fromhex(self.blindedOutputScriptHex)))
+        self.proof = bitcoinRPC("signmessagewithprivkey", params=[self.inputs[0]["privkey"], self.blindedOutputScriptHex])
+
+    def start(self):
+        self.createTransaction()
+        self.postInputs()
+        self.postConfirmation(loop=True)
 
     def postInputs(self):
-        response = self.session.post(self.url + "inputs", json=self.inputs)
+        data = {
+            "inputs": [],
+            "blindedOutputScriptHex": self.blindedOutputScriptHex,
+            "changeOutputAddress": self.changeOutputAddress
+        }
+        for _input in self.inputs:
+            data["inputs"].append({
+                "input": {
+                    "transactionId": _input["txid"],
+                    "index": _input["vout"]
+                },
+                "proof": self.proof
+            })
 
-        log("Post Input(s)", response)
+        response = self.session.post(self.url + "inputs", json=data)
+
+        log("Post Input(s)", printResponse(response))
 
         if response.status_code == 200:
             # BlindedOutputSignature, UniqueId, RoundId
@@ -125,6 +129,11 @@ class ZeroLink:
     @threaded
     def postConfirmation(self, loop=False):
         while True:
+            if loop:
+                time.sleep(55)
+            else:
+                break
+
             response = self.session.post(
                 self.url + "confirmation?uniqueId={}&roundId={}".format(
                     self.reference["uniqueId"],
@@ -136,9 +145,6 @@ class ZeroLink:
                 # RoundHash if the phase is already ConnectionConfirmation.
                 self.roundHash = json.loads(response.text)
                 print(self.roundHash)
-                # self.postOutput()
-                # time.sleep(5)
-                # self.getCoinJoin()
             elif response.status_code == 204:
                 # If the phase is InputRegistration and Alice is found.
                 pass
@@ -147,17 +153,13 @@ class ZeroLink:
                 pass
             elif response.status_code == 404:
                 # If Alice or the round is not found.
-                pass
+                self.postInputs() # Repost inputs
             elif response.status_code == 410:
-                # Participation can be only confirmed from a Running round’s InputRegistration or ConnectionConfirmation phase.
                 self.postOutput()
+                return
+                # Participation can be only confirmed from a Running round’s InputRegistration or ConnectionConfirmation phase.
             else:
                 raise("Unexpected status code.")
-
-            if loop:
-                time.sleep(55)
-            else:
-                break
 
     def postUnconfirmation(self):
         response = self.session.post(
@@ -184,10 +186,9 @@ class ZeroLink:
 
     # Not working
     def postOutput(self):
-        sig = self.reference["blindedOutputSignature"]
-        outputSignature = self.keys[0].unblind(int(binascii.hexlify(bytes(sig.encode('utf-8'))).decode(), 16), self.random)
-        outputAddress = list(self.outputs)[0]
-        signatureHex = format(outputSignature, 'x')
+        blindedOutputSignature = self.reference["blindedOutputSignature"]
+        outputAddress = list(self.outputs)[1]
+        signatureHex = self.pub.unblind(base64.b64decode(blindedOutputSignature), self.random).hex()
 
         response = self.session.post(
             self.url + "output?roundHash={}".format(
@@ -195,8 +196,12 @@ class ZeroLink:
                   "outputAddress": outputAddress,
                   "signatureHex": signatureHex
                 })
+        print(self.outputScriptHex)
+        print(signatureHex)
+        print(self.pub.verify(self.outputScriptHex, (int(signatureHex, 16),)))
 
         log("Post Output", response)
+        print(response.text)
 
         if response.status_code == 204:
             # Output is successfully registered.
