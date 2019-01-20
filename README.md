@@ -1,4 +1,4 @@
-# Zerolink Utility
+# Zerolink Utility (outdated)
 
 I'm still wrapping my head around the protocol and API so this may not be entirely correct but its not giving any errors so ¯\\\_(ツ)\_/¯
 
